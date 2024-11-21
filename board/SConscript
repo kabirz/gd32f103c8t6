@@ -23,6 +23,7 @@ elif rtconfig.PLATFORM in ['iccarm']:
     src += [startup_path_prefix + '/GD32F10x_Firmware_Library/CMSIS/GD/GD32F10x/Source/IAR/startup_gd32f10x_md.s']
 
 CPPDEFINES = ['GD32F10X_MD']
+src += [startup_path_prefix + '/GD32F10x_Firmware_Library/GD32F10x_standard_peripheral/Source/gd32f10x_fmc.c']
 group = DefineGroup('Drivers', src, depend = [''], CPPPATH = path, CPPDEFINES = CPPDEFINES)
 
 Return('group')
