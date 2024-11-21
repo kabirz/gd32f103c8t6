@@ -6,3 +6,5 @@ packages/packages.dbsqlite
 rtthread.bin
 rtthread.elf
 rtthread.map
+.cache
+compile_commands.json
