@@ -3,7 +3,7 @@ import os
 # toolchains options
 ARCH='arm'
 CPU='cortex-m3'
-CROSS_TOOL='keil'
+CROSS_TOOL='gcc'
 
 # bsp lib config
 BSP_LIBRARY_TYPE = None
@@ -17,7 +17,8 @@ if os.getenv('RTT_ROOT'):
 # EXEC_PATH is the compiler execute path, for example, CodeSourcery, Keil MDK, IAR
 if  CROSS_TOOL == 'gcc':
     PLATFORM    = 'gcc'
-    EXEC_PATH   = r'C:\Users\XXYYZZ'
+    EXEC_PATH   = '/usr/bin'
+    EXEC_PATH   = '/Users/zhp/zephyr-sdk-0.16.1/arm-zephyr-eabi/bin'
 elif CROSS_TOOL == 'keil':
     PLATFORM    = 'armcc'
     EXEC_PATH   = r'C:/Keil_v5'
@@ -32,7 +33,7 @@ BUILD = 'debug'
 
 if PLATFORM == 'gcc':
     # toolchains
-    PREFIX = 'arm-none-eabi-'
+    PREFIX = 'arm-zephyr-eabi-'
     CC = PREFIX + 'gcc'
     AS = PREFIX + 'gcc'
     AR = PREFIX + 'ar'
