@@ -75,9 +75,8 @@
 #define RT_USING_DEVICE_IPC
 #define RT_UNAMED_PIPE_NUMBER 64
 #define RT_USING_SERIAL
-#define RT_USING_SERIAL_V1
+#define RT_USING_SERIAL_V2
 #define RT_SERIAL_USING_DMA
-#define RT_SERIAL_RB_BUFSZ 64
 #define RT_USING_PIN
 /* end of Device Drivers */
 
@@ -143,7 +142,7 @@
 #define RT_S_REG_INPUT_START 0
 #define RT_S_REG_INPUT_NREGS 0
 #define RT_S_REG_HOLDING_START 0
-#define RT_S_REG_HOLDING_NREGS 5
+#define RT_S_REG_HOLDING_NREGS 6
 #define RT_S_HD_RESERVE 0
 #define RT_S_IN_RESERVE 0
 #define RT_S_CO_RESERVE 0
@@ -339,9 +338,11 @@
 #define BSP_USING_GPIO
 #define BSP_USING_UART
 #define BSP_USING_UART1
-#define BSP_UART1_RX_USING_DMA
+#define BSP_UART1_RX_BUFSIZE 256
+#define BSP_UART1_TX_BUFSIZE 0
 #define BSP_USING_UART2
-#define BSP_UART2_RX_USING_DMA
+#define BSP_UART2_RX_BUFSIZE 256
+#define BSP_UART2_TX_BUFSIZE 0
 #define BSP_USING_ON_CHIP_FLASH
 /* end of On-chip Peripheral Drivers */
 

@@ -19,7 +19,9 @@ enum {
 int main(void)
 {
     rt_uint32_t event_set = 0;
-    rt_tick_t tick_h = 0, tick_l = 0;
+    rt_tick_t tick_1 = 0, tick_2 = 0;
+
+    rt_event_init(&event, "power_event", RT_IPC_FLAG_PRIO);
 
     rt_pin_mode(PWR_CTL_IN_PINT, PIN_MODE_INPUT_PULLDOWN);
     rt_pin_mode(PWR_CTL_OUT_PINT, PIN_MODE_OUTPUT);
@@ -28,24 +30,21 @@ int main(void)
 
     mb_rtu_setup();
 
-    rt_event_init(&event, "power_event", RT_IPC_FLAG_PRIO);
 
     while (1) {
     	rt_event_recv(&event, PWR_PIN_LOW | PWR_PIN_HIGH, RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR, RT_WAITING_FOREVER, &event_set);
     	switch (event_set) {
-    	case PWR_PIN_LOW:
-    	    tick_l = rt_tick_get();
-    	    break;
     	case PWR_PIN_HIGH:
-    	    tick_h = rt_tick_get();
-    	    if (tick_h - tick_l > 100 && tick_h - tick_l < 500) {
-                rt_pin_irq_enable(PWR_CTL_IN_PINT, PIN_IRQ_DISABLE);
+    	    tick_1 = rt_tick_get();
+    	    break;
+    	case PWR_PIN_LOW:
+    	    tick_2 = rt_tick_get();
+    	    if (tick_2 - tick_1 > 100 && tick_2 - tick_1 < 500) {
                 power_reset();
-                rt_pin_irq_enable(PWR_CTL_IN_PINT, PIN_IRQ_ENABLE);
     	    }
     	default:
-    	    tick_l = 0;
-    	    tick_h = 0;
+    	    tick_1 = 0;
+    	    tick_2 = 0;
     	    break;
     	}
     }
@@ -55,8 +54,10 @@ int main(void)
 
 static void power_in_isr(void *args)
 {
+    rt_interrupt_enter();
     rt_size_t level = rt_pin_read(PWR_CTL_IN_PINT);
     rt_event_send(&event, level == PIN_LOW ? PWR_PIN_LOW : PWR_PIN_HIGH);
+    rt_interrupt_leave();
 }
 
 
@@ -139,6 +140,7 @@ static void mb_rtu_poll(void *parameter)
 
 static void set_mb_cfg_default(void)
 {
+    rt_memset(&mb_datas, 0, sizeof(mb_datas));
     mb_datas.magic = 0xdead;
     mb_datas.holding_buf[HOLDING_PWR_LEVEL] = 1;
     mb_datas.holding_buf[HOLDING_PWR_STATUS] = 1;
@@ -154,14 +156,21 @@ static int mb_rtu_setup(void)
         rt_kprintf("read holding regs from flash failed!\n");
         set_mb_cfg_default();
     } else {
-        int crc16 = usMBCRC16((UCHAR *)mb_datas.holding_buf, sizeof(mb_datas.holding_buf));
-        if (crc16 != mb_datas.crc16) {
-            rt_kprintf("crc16 error!");
+    	if (mb_datas.magic != 0xdead) {
+            rt_kprintf("magic error!");
             set_mb_cfg_default();
+    	} else {
+            int crc16 = usMBCRC16((UCHAR *)mb_datas.holding_buf, sizeof(mb_datas.holding_buf));
+            if (crc16 != mb_datas.crc16) {
+            	rt_kprintf("crc16 error!");
+            	set_mb_cfg_default();
+            }
         }
     }
 
     /* init */
+    mb_datas.holding_buf[HOLDING_PWR_RESET] = 0;
+    rt_memcpy((void *)HOLDING_REGS, mb_datas.holding_buf, sizeof(mb_datas.holding_buf));
     if (mb_datas.holding_buf[HOLDING_PWR_STATUS])
         rt_pin_write(PWR_CTL_OUT_PINT, mb_datas.holding_buf[HOLDING_PWR_LEVEL] == 0 ? PIN_LOW : PIN_HIGH);
     else
