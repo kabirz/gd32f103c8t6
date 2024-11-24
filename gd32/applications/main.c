@@ -8,8 +8,8 @@ static void power_reset(void);
 static void power_in_isr(void *args);
 static struct rt_event event;
 
-#define PWR_CTL_IN_PINT GET_PIN(B, 15)
-#define PWR_CTL_OUT_PINT GET_PIN(B, 13)
+#define PWR_CTL_IN_PIN GET_PIN(B, 15)
+#define PWR_CTL_OUT_PIN GET_PIN(B, 13)
 
 enum {
     PWR_PIN_LOW = 1,
@@ -23,12 +23,13 @@ int main(void)
 
     rt_event_init(&event, "power_event", RT_IPC_FLAG_PRIO);
 
-    rt_pin_mode(PWR_CTL_IN_PINT, PIN_MODE_INPUT_PULLDOWN);
-    rt_pin_mode(PWR_CTL_OUT_PINT, PIN_MODE_OUTPUT);
-    rt_pin_attach_irq(PWR_CTL_IN_PINT, PIN_IRQ_MODE_RISING_FALLING, power_in_isr, RT_NULL);
-    rt_pin_irq_enable(PWR_CTL_IN_PINT, PIN_IRQ_ENABLE);
+    rt_pin_mode(PWR_CTL_IN_PIN, PIN_MODE_INPUT_PULLDOWN);
+    rt_pin_mode(PWR_CTL_OUT_PIN, PIN_MODE_OUTPUT);
+    rt_pin_attach_irq(PWR_CTL_IN_PIN, PIN_IRQ_MODE_RISING_FALLING, power_in_isr, RT_NULL);
+    rt_pin_irq_enable(PWR_CTL_IN_PIN, PIN_IRQ_ENABLE);
 
     mb_rtu_setup();
+    rt_kprintf("gd32f103c8t6, sysclock: %dMhz\n", SystemCoreClock/1000000);
 
 
     while (1) {
@@ -55,7 +56,7 @@ int main(void)
 static void power_in_isr(void *args)
 {
     rt_interrupt_enter();
-    rt_size_t level = rt_pin_read(PWR_CTL_IN_PINT);
+    rt_size_t level = rt_pin_read(PWR_CTL_IN_PIN);
     rt_event_send(&event, level == PIN_LOW ? PWR_PIN_LOW : PWR_PIN_HIGH);
     rt_interrupt_leave();
 }
@@ -86,9 +87,9 @@ static struct {
 static void power_reset(void)
 {
     rt_thread_mdelay(mb_datas.holding_buf[HOLDING_PWR_DELAY_WAIT]);
-    rt_pin_write(PWR_CTL_OUT_PINT, PIN_LOW);
+    rt_pin_write(PWR_CTL_OUT_PIN, PIN_LOW);
     rt_thread_mdelay(mb_datas.holding_buf[HOLDING_PWR_DELAY_ON]);
-    rt_pin_write(PWR_CTL_OUT_PINT, PIN_HIGH);
+    rt_pin_write(PWR_CTL_OUT_PIN, PIN_HIGH);
 }
 
 
@@ -116,7 +117,7 @@ static void holding_handler(void)
         /* save to flash */
         mb_datas.crc16 = usMBCRC16((UCHAR *)mb_datas.holding_buf, sizeof(mb_datas.holding_buf));
         if (flash_write(&mb_datas, sizeof(mb_datas))) {
-            rt_kprintf("save holding regs to flash failed!");
+            rt_kprintf("save holding regs to flash failed!\n");
         }
     }
 
@@ -157,12 +158,12 @@ static int mb_rtu_setup(void)
         set_mb_cfg_default();
     } else {
     	if (mb_datas.magic != 0xdead) {
-            rt_kprintf("magic error!");
+            rt_kprintf("magic error!\n");
             set_mb_cfg_default();
     	} else {
             int crc16 = usMBCRC16((UCHAR *)mb_datas.holding_buf, sizeof(mb_datas.holding_buf));
             if (crc16 != mb_datas.crc16) {
-            	rt_kprintf("crc16 error!");
+            	rt_kprintf("crc16 error!\n");
             	set_mb_cfg_default();
             }
         }
@@ -172,9 +173,9 @@ static int mb_rtu_setup(void)
     mb_datas.holding_buf[HOLDING_PWR_RESET] = 0;
     rt_memcpy((void *)HOLDING_REGS, mb_datas.holding_buf, sizeof(mb_datas.holding_buf));
     if (mb_datas.holding_buf[HOLDING_PWR_STATUS])
-        rt_pin_write(PWR_CTL_OUT_PINT, mb_datas.holding_buf[HOLDING_PWR_LEVEL] == 0 ? PIN_LOW : PIN_HIGH);
+        rt_pin_write(PWR_CTL_OUT_PIN, mb_datas.holding_buf[HOLDING_PWR_LEVEL] == 0 ? PIN_LOW : PIN_HIGH);
     else
-        rt_pin_write(PWR_CTL_OUT_PINT, PIN_LOW);
+        rt_pin_write(PWR_CTL_OUT_PIN, PIN_LOW);
 
 
     rt_thread_t tid1 = RT_NULL;
