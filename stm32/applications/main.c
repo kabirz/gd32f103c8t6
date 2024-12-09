@@ -71,7 +71,8 @@ enum {
     HOLDING_PWR_STATUS, /* 0: power off, 1: power on */
     HOLDING_PWR_DELAY_WAIT, /* delay time for wait */
     HOLDING_PWR_DELAY_ON, /* delay time for power on */
-    HOLDING_PWR_RESET,  /* 0: no reset, 1: reset */
+    HOLDING_PWR_RESET,  /* 1: power status reset */
+    HOLDING_SYS_REBOOT,  /* 1: board reboot */
 };
 
 #define HOLDING_REGS ((volatile uint16_t*)&modbus_reg_bufs[S_REG_HOLDING_START])
@@ -89,9 +90,9 @@ static struct {
 static void power_reset(void)
 {
     rt_thread_mdelay(mb_datas.holding_buf[HOLDING_PWR_DELAY_WAIT]);
-    rt_pin_write(PWR_CTL_OUT_PIN, PIN_LOW);
+    rt_pin_write(PWR_CTL_OUT_PIN, !mb_datas.holding_buf[HOLDING_PWR_LEVEL]);
     rt_thread_mdelay(mb_datas.holding_buf[HOLDING_PWR_DELAY_ON]);
-    rt_pin_write(PWR_CTL_OUT_PIN, PIN_HIGH);
+    rt_pin_write(PWR_CTL_OUT_PIN, mb_datas.holding_buf[HOLDING_PWR_LEVEL]);
 }
 
 
@@ -104,9 +105,17 @@ static void holding_handler(void)
             continue;
         switch (i) {
         case HOLDING_PWR_RESET:
-            power_reset();
+            if (HOLDING_REGS[i] == 1)
+                power_reset();
             HOLDING_REGS[i] = 0;
             break;
+        case HOLDING_SYS_REBOOT:
+            if (HOLDING_REGS[i] == 1)
+                rt_hw_cpu_reset();
+            break;
+        case HOLDING_PWR_LEVEL:
+        case HOLDING_PWR_STATUS:
+            HOLDING_REGS[i] = !!HOLDING_REGS[i];
         default:
             changed = true;
             break;
@@ -175,9 +184,9 @@ static int mb_rtu_setup(void)
     mb_datas.holding_buf[HOLDING_PWR_RESET] = 0;
     rt_memcpy((void *)HOLDING_REGS, mb_datas.holding_buf, sizeof(mb_datas.holding_buf));
     if (mb_datas.holding_buf[HOLDING_PWR_STATUS])
-        rt_pin_write(PWR_CTL_OUT_PIN, mb_datas.holding_buf[HOLDING_PWR_LEVEL] == 0 ? PIN_LOW : PIN_HIGH);
+        rt_pin_write(PWR_CTL_OUT_PIN, mb_datas.holding_buf[HOLDING_PWR_LEVEL]);
     else
-        rt_pin_write(PWR_CTL_OUT_PIN, PIN_LOW);
+        rt_pin_write(PWR_CTL_OUT_PIN, !mb_datas.holding_buf[HOLDING_PWR_LEVEL]);
 
 
     rt_thread_t tid1 = RT_NULL;
