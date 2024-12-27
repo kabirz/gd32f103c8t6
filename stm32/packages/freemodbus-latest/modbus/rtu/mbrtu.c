@@ -306,6 +306,7 @@ xMBRTUTransmitFSM( void )
         }
         else
         {
+            rt_thread_mdelay(5);
             xNeedPoll = xMBPortEventPost( MB_RTU, EV_FRAME_SENT );
             /* Disable transmitter. This prevents another transmit buffer
              * empty interrupt. */

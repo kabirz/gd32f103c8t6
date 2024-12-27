@@ -12,11 +12,10 @@ static struct rt_event event;
 
 #define PWR_CTL_IN_PIN GET_PIN(B, 15)
 #define PWR_CTL_OUT_PIN GET_PIN(B, 13)
+#define POWER_RESET 1
 
-enum {
-    PWR_PIN_LOW = 1,
-    PWR_PIN_HIGH
-} pin_status;
+bool skip_irq;
+rt_tick_t tick;
 
 int main(void)
 {
@@ -35,21 +34,26 @@ int main(void)
 
 
     while (1) {
-    	rt_event_recv(&event, PWR_PIN_LOW | PWR_PIN_HIGH, RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR, RT_WAITING_FOREVER, &event_set);
+    	rt_event_recv(&event, POWER_RESET, RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR, RT_WAITING_FOREVER, &event_set);
+    	skip_irq = true;
     	switch (event_set) {
-    	case PWR_PIN_HIGH:
-    	    tick_1 = rt_tick_get();
-    	    break;
-    	case PWR_PIN_LOW:
-    	    tick_2 = rt_tick_get();
-    	    if (tick_2 - tick_1 > 100 && tick_2 - tick_1 < 500) {
-                power_reset();
+    	case POWER_RESET:
+    	    rt_thread_mdelay(20); /* debouncing delay */
+    	    if (rt_pin_read(PWR_CTL_IN_PIN)) {
+    	    	tick_1 = tick;
+    	    	rt_kprintf("l->h:[%d] ticks: %d\n", rt_pin_read(PWR_CTL_IN_PIN), tick_1);
+    	    } else {
+    	    	tick_2 = tick;
+    	    	rt_kprintf("h->l:[%d] ticks: %d, diff: %d\n", rt_pin_read(PWR_CTL_IN_PIN), tick_2, tick_2 - tick_1);
+    	    	if (tick_2 - tick_1 > 100 && tick_2 - tick_1 < 500) {
+    	    	    power_reset();
+    	    	}
+    	    	tick_1 = tick_2 = 0;
     	    }
     	default:
-    	    tick_1 = 0;
-    	    tick_2 = 0;
     	    break;
     	}
+    	skip_irq = false;
     }
 
     return RT_EOK;
@@ -58,8 +62,10 @@ int main(void)
 static void power_in_isr(void *args)
 {
     rt_interrupt_enter();
-    rt_size_t level = rt_pin_read(PWR_CTL_IN_PIN);
-    rt_event_send(&event, level == PIN_LOW ? PWR_PIN_LOW : PWR_PIN_HIGH);
+    if (!skip_irq) {
+    	tick = rt_tick_get();
+    	rt_event_send(&event, POWER_RESET);
+    }
     rt_interrupt_leave();
 }
 
@@ -90,6 +96,7 @@ static struct {
 static void power_reset(void)
 {
     rt_thread_mdelay(mb_datas.holding_buf[HOLDING_PWR_DELAY_WAIT]);
+    rt_kprintf("power reset......\n");
     rt_pin_write(PWR_CTL_OUT_PIN, !mb_datas.holding_buf[HOLDING_PWR_LEVEL]);
     rt_thread_mdelay(mb_datas.holding_buf[HOLDING_PWR_DELAY_ON]);
     rt_pin_write(PWR_CTL_OUT_PIN, mb_datas.holding_buf[HOLDING_PWR_LEVEL]);
@@ -154,10 +161,10 @@ static void set_mb_cfg_default(void)
 {
     rt_memset(&mb_datas, 0, sizeof(mb_datas));
     mb_datas.magic = 0xdead;
-    mb_datas.holding_buf[HOLDING_PWR_LEVEL] = 1;
+    mb_datas.holding_buf[HOLDING_PWR_LEVEL] = 0;
     mb_datas.holding_buf[HOLDING_PWR_STATUS] = 1;
-    mb_datas.holding_buf[HOLDING_PWR_DELAY_WAIT] = 100;
-    mb_datas.holding_buf[HOLDING_PWR_DELAY_ON] = 200;
+    mb_datas.holding_buf[HOLDING_PWR_DELAY_WAIT] = 3000;
+    mb_datas.holding_buf[HOLDING_PWR_DELAY_ON] = 3000;
 }
 
 static int mb_rtu_setup(void)
